@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { syncSeed } from "@/lib/seed";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const token = process.env.ADMIN_SYNC_TOKEN;
   const provided = request.headers.get("x-sync-token");

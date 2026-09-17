@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="SiteAtlas favicon">
+  <rect width="256" height="256" fill="#000000"/>
+  <g fill="none" stroke="#DB7B4A" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M84 109c0-37 29-66 66-66s66 29 66 66c0 46-39 82-66 121-27-39-66-75-66-121Z"/>
+    <circle cx="150" cy="111" r="24" fill="#000000"/>
+    <rect x="118" y="115" width="118" height="88" rx="6"/>
+    <path d="M132 203h90"/>
+    <path d="M160 203v18"/>
+    <path d="M195 203v18"/>
+    <path d="M108 132h24"/>
+    <path d="M95 99l11 12"/>
+    <path d="M205 99l-11 12"/>
+  </g>
+</svg>

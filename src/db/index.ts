@@ -8,17 +8,20 @@ if (!databaseUrl) {
 }
 
 const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
+  __siteAtlasPostgresqlPool?: Pool;
 };
 
 export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
+  globalForDb.__siteAtlasPostgresqlPool ??
   new Pool({
     connectionString: databaseUrl,
+    max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+    idleTimeoutMillis: Number(process.env.DATABASE_IDLE_TIMEOUT_MS ?? 30_000),
+    connectionTimeoutMillis: Number(process.env.DATABASE_CONNECTION_TIMEOUT_MS ?? 5_000),
   });
 
 if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
+  globalForDb.__siteAtlasPostgresqlPool = pool;
 }
 
 export const db = drizzle(pool);

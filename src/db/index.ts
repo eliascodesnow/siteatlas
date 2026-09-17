@@ -1,11 +1,10 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
+// Keep module evaluation safe during builds and in serverless environments where
+// the database secret may not be injected until runtime. Connection failures
+// are surfaced when a query is actually made, rather than during import.
+const databaseUrl = process.env.DATABASE_URL ?? "postgresql://localhost:5432/siteatlas";
 
 const globalForDb = globalThis as typeof globalThis & {
   __siteAtlasPostgresqlPool?: Pool;

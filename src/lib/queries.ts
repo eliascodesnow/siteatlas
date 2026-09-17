@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, asc, desc, eq, ilike, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { businesses, type BusinessRow } from "@/db/schema";
 import { ensureSeeded } from "@/lib/seed";
@@ -26,7 +26,6 @@ const summaryColumns = {
 
 type RawSummary = Omit<BusinessSummary, "category"> & { category: string };
 const toSummary = (r: RawSummary): BusinessSummary => ({ ...r, category: r.category as CategorySlug });
-
 const published = eq(businesses.conceptStatus, "published");
 
 export interface CatalogueFilters {
@@ -42,6 +41,10 @@ export interface CatalogueFilters {
   excludeSlug?: string;
 }
 
+function fullTextMatch(term: string): SQL {
+  return sql`to_tsvector('simple', ${businesses.searchText}) @@ plainto_tsquery('simple', ${term})`;
+}
+
 function buildWhere(f: CatalogueFilters): SQL | undefined {
   const parts: SQL[] = [published];
   if (f.category) parts.push(eq(businesses.category, f.category));
@@ -52,10 +55,9 @@ function buildWhere(f: CatalogueFilters): SQL | undefined {
   if (typeof f.international === "boolean") parts.push(eq(businesses.international, f.international));
   if (typeof f.featured === "boolean") parts.push(eq(businesses.featured, f.featured));
   if (f.excludeSlug) parts.push(ne(businesses.slug, f.excludeSlug));
-  if (f.q && f.q.trim()) {
-    const terms = f.q.toLowerCase().trim().split(/\s+/).slice(0, 6);
-    for (const term of terms) {
-      parts.push(ilike(businesses.searchText, `%${term.replace(/[%_]/g, "")}%`));
+  if (f.q?.trim()) {
+    for (const term of f.q.trim().split(/\s+/).slice(0, 6)) {
+      if (term.length > 0) parts.push(fullTextMatch(term));
     }
   }
   return and(...parts);
@@ -68,7 +70,7 @@ export const listBusinesses = cache(async (filters: CatalogueFilters = {}): Prom
     .from(businesses)
     .where(buildWhere(filters))
     .orderBy(desc(businesses.featured), asc(businesses.sortOrder))
-    .limit(filters.limit ?? 500);
+    .limit(Math.min(Math.max(filters.limit ?? 100, 1), 100));
   return rows.map(toSummary);
 });
 
@@ -80,7 +82,6 @@ export async function searchBusinesses(q: string): Promise<BusinessSummary[]> {
   if (strict.length) return strict;
   const terms = term.toLowerCase().split(/\s+/).filter((t) => t.length > 1).slice(0, 6);
   if (terms.length < 2) return [];
-  // rarer terms are more specific, so they weigh more ("diani" beats "hotel")
   const hits = new Map<string, { b: BusinessSummary; score: number }>();
   const perTerm = await Promise.all(terms.map((t) => listBusinesses({ q: t })));
   perTerm.forEach((matches) => {
@@ -102,78 +103,34 @@ export const getBusinessBySlug = cache(async (slug: string): Promise<BusinessRow
 
 export const getRelatedBusinesses = cache(async (row: BusinessRow, limit = 4): Promise<BusinessSummary[]> => {
   await ensureSeeded();
-  const notSelf = ne(businesses.id, row.id);
   const sameCategory = eq(businesses.category, row.category);
   const sameCity = eq(businesses.citySlug, row.citySlug);
   const sameStyle = eq(businesses.websiteStyle, row.websiteStyle);
   const score = sql<number>`(case when ${sameCategory} then 3 else 0 end) + (case when ${sameCity} then 2 else 0 end) + (case when ${sameStyle} then 1 else 0 end)`;
-  const rows = await db
-    .select(summaryColumns)
-    .from(businesses)
-    .where(and(published, notSelf, or(sameCategory, sameCity, sameStyle)))
-    .orderBy(desc(score), asc(businesses.sortOrder))
-    .limit(limit);
+  const rows = await db.select(summaryColumns).from(businesses).where(and(published, ne(businesses.id, row.id), or(sameCategory, sameCity, sameStyle))).orderBy(desc(score), asc(businesses.sortOrder)).limit(limit);
   return rows.map(toSummary);
 });
 
-export interface FacetCount {
-  key: string;
-  label: string;
-  count: number;
-}
-
+export interface FacetCount { key: string; label: string; count: number }
 export const categoryCounts = cache(async (): Promise<FacetCount[]> => {
   await ensureSeeded();
-  const rows = await db
-    .select({ key: businesses.category, count: sql<number>`count(*)::int` })
-    .from(businesses)
-    .where(published)
-    .groupBy(businesses.category);
+  const rows = await db.select({ key: businesses.category, count: sql<number>`count(*)::int` }).from(businesses).where(published).groupBy(businesses.category);
   return rows.map((r) => ({ key: r.key, label: r.key, count: Number(r.count) }));
 });
 
 export interface LocationCount {
-  countrySlug: string;
-  country: string;
-  citySlug: string;
-  city: string;
-  neighborhoodSlug: string | null;
-  neighborhood: string | null;
-  count: number;
+  countrySlug: string; country: string; citySlug: string; city: string;
+  neighborhoodSlug: string | null; neighborhood: string | null; count: number;
 }
-
 export const locationCounts = cache(async (): Promise<LocationCount[]> => {
   await ensureSeeded();
-  const rows = await db
-    .select({
-      countrySlug: businesses.countrySlug,
-      country: businesses.country,
-      citySlug: businesses.citySlug,
-      city: businesses.city,
-      neighborhoodSlug: businesses.neighborhoodSlug,
-      neighborhood: businesses.neighborhood,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(businesses)
-    .where(published)
-    .groupBy(
-      businesses.countrySlug,
-      businesses.country,
-      businesses.citySlug,
-      businesses.city,
-      businesses.neighborhoodSlug,
-      businesses.neighborhood,
-    );
+  const rows = await db.select({ countrySlug: businesses.countrySlug, country: businesses.country, citySlug: businesses.citySlug, city: businesses.city, neighborhoodSlug: businesses.neighborhoodSlug, neighborhood: businesses.neighborhood, count: sql<number>`count(*)::int` }).from(businesses).where(published).groupBy(businesses.countrySlug, businesses.country, businesses.citySlug, businesses.city, businesses.neighborhoodSlug, businesses.neighborhood);
   return rows.map((r) => ({ ...r, count: Number(r.count) }));
 });
 
 export const styleCounts = cache(async (): Promise<FacetCount[]> => {
   await ensureSeeded();
-  const rows = await db
-    .select({ key: businesses.websiteStyle, count: sql<number>`count(*)::int` })
-    .from(businesses)
-    .where(published)
-    .groupBy(businesses.websiteStyle);
+  const rows = await db.select({ key: businesses.websiteStyle, count: sql<number>`count(*)::int` }).from(businesses).where(published).groupBy(businesses.websiteStyle);
   return rows.map((r) => ({ key: r.key, label: r.key, count: Number(r.count) }));
 });
 

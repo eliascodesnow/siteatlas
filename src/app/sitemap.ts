@@ -3,15 +3,11 @@ import { CATEGORIES } from "@/data/taxonomy";
 import { allSlugs, locationCounts } from "@/lib/queries";
 import { SITE_URL } from "@/lib/site";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [slugs, locs] = await Promise.all([allSlugs(), locationCounts()]);
-  const staticRoutes = ["", "/explore", "/categories", "/locations", "/about", "/contact"].map((p) => ({
-    url: `${SITE_URL}${p}`,
-    changeFrequency: "weekly" as const,
-    priority: p === "" ? 1 : 0.7,
-  }));
+  const staticRoutes = ["", "/explore", "/categories", "/locations", "/about", "/contact"].map((p) => ({ url: `${SITE_URL}${p}`, changeFrequency: "weekly" as const, priority: p === "" ? 1 : 0.7 }));
   const categoryRoutes = CATEGORIES.map((c) => ({ url: `${SITE_URL}/categories/${c.slug}`, changeFrequency: "weekly" as const, priority: 0.6 }));
   const locationSet = new Set<string>();
   for (const l of locs) {

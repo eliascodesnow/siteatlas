@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { analyticsEvents } from "@/db/schema";
 
+export const dynamic = "force-dynamic";
+
 const ALLOWED = new Set(["concept_view", "category_view", "location_view", "search", "filter_apply", "whatsapp_cta_click", "business_cta_click", "outbound_click", "related_concept_click"]);
 const MAX_BODY_BYTES = 8_192;
 

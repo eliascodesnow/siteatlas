@@ -13,6 +13,11 @@ export const metadata: Metadata = {
   description:
     "A curated showcase of independent website concepts created by Kinetix Africa for real businesses across Kenya and beyond.",
   applicationName: "SiteAtlas",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
   openGraph: {
     type: "website",
     siteName: "SiteAtlas by Kinetix Africa",

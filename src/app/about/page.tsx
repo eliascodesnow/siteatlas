@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PlatformShell } from "@/components/platform/PlatformShell";
 import { TrackedLink } from "@/components/platform/TrackedLink";
 import { generalEnquiryMessage, whatsappLink } from "@/lib/whatsapp";
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: "About SiteAtlas",

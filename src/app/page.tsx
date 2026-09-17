@@ -1,0 +1,251 @@
+import Link from "next/link";
+import { BusinessCard } from "@/components/platform/BusinessCard";
+import { Photo } from "@/components/platform/Photo";
+import { PlatformShell } from "@/components/platform/PlatformShell";
+import { Reveal } from "@/components/platform/Reveal";
+import { TrackedLink } from "@/components/platform/TrackedLink";
+import { poolImage } from "@/data/images";
+import { CATEGORIES, CATEGORY_MAP, LOCATION_TREE } from "@/data/taxonomy";
+import { categoryCounts, listBusinesses, locationCounts } from "@/lib/queries";
+import type { CategorySlug } from "@/lib/types";
+import { generalEnquiryMessage, whatsappLink } from "@/lib/whatsapp";
+
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const [featured, kenyan, international, cats, locs] = await Promise.all([
+    listBusinesses({ featured: true, limit: 9 }),
+    listBusinesses({ international: false, limit: 7 }),
+    listBusinesses({ international: true, limit: 4 }),
+    categoryCounts(),
+    locationCounts(),
+  ]);
+
+  const collage = featured.slice(0, 3);
+  const spotlight = featured.slice(3, 6);
+  const catCount = new Map(cats.map((c) => [c.key, c.count]));
+  const cityCount = new Map<string, { name: string; count: number }>();
+  for (const l of locs) {
+    if (l.countrySlug !== "kenya") continue;
+    const e = cityCount.get(l.citySlug) ?? { name: l.city, count: 0 };
+    e.count += l.count;
+    cityCount.set(l.citySlug, e);
+  }
+  const kenyaNode = LOCATION_TREE.find((n) => n.slug === "kenya");
+  const cities = (kenyaNode?.children ?? []).filter((c) => cityCount.has(c.slug));
+  const nairobiHoods = locs
+    .filter((l) => l.citySlug === "nairobi" && l.neighborhoodSlug)
+    .reduce<Map<string, { name: string; count: number }>>((m, l) => {
+      const e = m.get(l.neighborhoodSlug!) ?? { name: l.neighborhood!, count: 0 };
+      e.count += l.count;
+      m.set(l.neighborhoodSlug!, e);
+      return m;
+    }, new Map());
+  const total = cats.reduce((n, c) => n + c.count, 0);
+
+  return (
+    <PlatformShell>
+      {/* Hero */}
+      <section className="container-wide pt-14 sm:pt-20 lg:pt-28">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-7">
+            <p className="eyebrow text-mute">Website concepts by Kinetix Africa</p>
+            <h1 className="display-1 mt-6">
+              Real businesses.
+              <br />
+              <span className="italic">Reimagined</span> for the web.
+            </h1>
+            <p className="mt-8 max-w-md text-base leading-relaxed text-mute sm:text-lg">
+              A curated showcase of website concepts created by Kinetix Africa for businesses across Kenya and beyond.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <Link href="/explore" className="btn-ink">
+                Explore concepts
+              </Link>
+              <TrackedLink href={whatsappLink(generalEnquiryMessage())} external event="whatsapp_cta_click" props={{ placement: "hero" }} className="btn-outline">
+                Work with Kinetix Africa
+              </TrackedLink>
+            </div>
+            <p className="mt-10 max-w-sm text-xs leading-relaxed text-mute-2">
+              {total} independent concepts. Not official websites — design studies showing what each real business could look like online.
+            </p>
+          </div>
+
+          {/* Collage */}
+          <div className="lg:col-span-5">
+            <div className="grid grid-cols-6 gap-3 sm:gap-4">
+              {collage[0] && (
+                <Link href={`/business/${collage[0].slug}`} className="group relative col-span-4 aspect-[4/5] overflow-hidden bg-paper-2">
+                  <Photo id={poolImage(collage[0].imagery.pool, collage[0].imagery.hero).id} alt={`Concept for ${collage[0].name}`} sizes="(min-width:1024px) 28vw, 66vw" priority className="transition-transform duration-700 ease-out-expo group-hover:scale-[1.03]" />
+                  <CollageLabel b={collage[0]} />
+                </Link>
+              )}
+              {collage[1] && (
+                <Link href={`/business/${collage[1].slug}`} className="group relative col-span-2 mt-12 aspect-[3/4] self-end overflow-hidden bg-paper-2 sm:mt-20">
+                  <Photo id={poolImage(collage[1].imagery.pool, collage[1].imagery.hero).id} alt={`Concept for ${collage[1].name}`} sizes="(min-width:1024px) 14vw, 33vw" priority className="transition-transform duration-700 ease-out-expo group-hover:scale-[1.03]" />
+                </Link>
+              )}
+              {collage[2] && (
+                <Link href={`/business/${collage[2].slug}`} className="group relative col-span-3 col-start-3 -mt-6 aspect-[16/10] overflow-hidden bg-paper-2 sm:-mt-10">
+                  <Photo id={poolImage(collage[2].imagery.pool, collage[2].imagery.hero).id} alt={`Concept for ${collage[2].name}`} sizes="(min-width:1024px) 20vw, 50vw" className="transition-transform duration-700 ease-out-expo group-hover:scale-[1.03]" />
+                  <CollageLabel b={collage[2]} />
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured */}
+      <section className="container-wide mt-24 sm:mt-32 lg:mt-40">
+        <SectionHead eyebrow="Featured concepts" title="Selected work from the catalogue" href="/explore" linkLabel="All concepts" />
+        <div className="mt-10 grid gap-x-6 gap-y-12 lg:grid-cols-12 lg:gap-y-0">
+          {spotlight[0] && (
+            <Reveal className="lg:col-span-8">
+              <BusinessCard business={spotlight[0]} variant="feature" index={0} />
+            </Reveal>
+          )}
+          <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:col-span-4 lg:grid-cols-1 lg:gap-y-10">
+            {spotlight.slice(1, 3).map((b, i) => (
+              <Reveal key={b.slug} delay={i * 80}>
+                <BusinessCard business={b} variant="tall" />
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Categories index */}
+      <section className="container-wide mt-24 sm:mt-32 lg:mt-40">
+        <SectionHead eyebrow="Explore by category" title="Every industry, one design standard" href="/categories" linkLabel="All categories" />
+        <ol className="mt-10 grid border-t border-line sm:grid-cols-2 lg:grid-cols-3">
+          {CATEGORIES.filter((c) => catCount.has(c.slug)).map((c, i) => (
+            <li key={c.slug} className="border-b border-line">
+              <Link href={`/categories/${c.slug}`} className="group flex items-baseline justify-between gap-4 py-5 pr-2">
+                <span className="flex items-baseline gap-4">
+                  <span className="w-6 text-xs text-mute-2">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="font-serif text-2xl leading-none transition-colors group-hover:text-mute sm:text-[1.75rem]">{c.name}</span>
+                </span>
+                <span className="text-xs text-mute">{catCount.get(c.slug)}</span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Locations */}
+      <section className="container-wide mt-24 sm:mt-32 lg:mt-40">
+        <div className="grid gap-12 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <p className="eyebrow text-mute">Explore by location</p>
+            <h2 className="display-2 mt-4">Kenya, city by city</h2>
+            <p className="mt-6 max-w-sm text-mute">
+              Nairobi neighbourhood by neighbourhood, then the coast, the lake, the Rift Valley and the highlands.
+            </p>
+            <Link href="/locations" className="link-underline mt-8 inline-block text-sm">
+              Browse all locations
+            </Link>
+          </div>
+          <div className="lg:col-span-7">
+            <ul className="flex flex-wrap gap-x-8 gap-y-3">
+              {cities.map((c) => (
+                <li key={c.slug}>
+                  <Link href={`/locations/kenya/${c.slug}`} className="group inline-flex items-baseline gap-2 font-serif text-3xl leading-none sm:text-4xl">
+                    <span className="transition-colors group-hover:text-mute">{c.name}</span>
+                    <span className="text-xs text-mute">{cityCount.get(c.slug)?.count}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="eyebrow mt-12 text-mute">Within Nairobi</p>
+            <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+              {[...nairobiHoods.entries()]
+                .sort((a, b) => b[1].count - a[1].count)
+                .map(([slug, v]) => (
+                  <li key={slug}>
+                    <Link href={`/locations/kenya/nairobi/${slug}`} className="link-underline">
+                      {v.name} <span className="text-mute-2">{v.count}</span>
+                    </Link>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Selected Kenyan businesses */}
+      <section className="container-wide mt-24 sm:mt-32 lg:mt-40">
+        <SectionHead eyebrow="Selected Kenyan businesses" title="From the catalogue" href="/locations/kenya" linkLabel="All Kenyan concepts" />
+        <div className="mt-6 border-t border-line">
+          {kenyan.slice(0, 6).map((b) => (
+            <BusinessCard key={b.slug} business={b} variant="row" />
+          ))}
+        </div>
+      </section>
+
+      {/* International */}
+      {international.length > 0 && (
+        <section className="container-wide mt-24 sm:mt-32 lg:mt-40">
+          <SectionHead eyebrow="International concepts" title="Benchmarks from abroad" href="/explore?international=1" linkLabel="View international" />
+          <p className="mt-4 max-w-xl text-sm text-mute">
+            A small set of recognisable international brands, included for visual range. Like every concept here, these are independent studies with no affiliation.
+          </p>
+          <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-4 lg:gap-x-6">
+            {international.map((b) => (
+              <BusinessCard key={b.slug} business={b} variant="compact" />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* CTA */}
+      <section className="mt-24 bg-ink text-paper sm:mt-32 lg:mt-40">
+        <div className="container-wide grid gap-10 py-20 lg:grid-cols-12 lg:py-32">
+          <div className="lg:col-span-8">
+            <p className="eyebrow text-paper/50">Kinetix Africa</p>
+            <h2 className="display-2 mt-5">See what your business could look like online.</h2>
+            <p className="mt-6 max-w-lg text-paper/70">
+              Every concept in this catalogue was built the way we build for clients: real content structure, real conversion paths, designed for the phone in your customer&apos;s hand.
+            </p>
+          </div>
+          <div className="flex flex-col items-start justify-end gap-4 lg:col-span-4 lg:items-end">
+            <TrackedLink
+              href={whatsappLink(generalEnquiryMessage())}
+              external
+              event="whatsapp_cta_click"
+              props={{ placement: "home_cta" }}
+              className="inline-flex items-center gap-3 bg-paper px-6 py-4 text-sm font-medium text-ink transition-colors hover:bg-paper-2"
+            >
+              Get a website
+              <span aria-hidden>→</span>
+            </TrackedLink>
+            <p className="text-xs text-paper/50">Opens WhatsApp · +254 792 656 824</p>
+          </div>
+        </div>
+      </section>
+    </PlatformShell>
+  );
+}
+
+function SectionHead({ eyebrow, title, href, linkLabel }: { eyebrow: string; title: string; href: string; linkLabel: string }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="eyebrow text-mute">{eyebrow}</p>
+        <h2 className="display-3 mt-3">{title}</h2>
+      </div>
+      <Link href={href} className="link-underline text-sm">
+        {linkLabel}
+      </Link>
+    </div>
+  );
+}
+
+function CollageLabel({ b }: { b: { name: string; category: string } }) {
+  return (
+    <span className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 bg-paper/95 px-3 py-2 text-[0.7rem]">
+      <span className="truncate font-medium">{b.name}</span>
+      <span className="shrink-0 text-mute">{CATEGORY_MAP[b.category as CategorySlug]?.short}</span>
+    </span>
+  );
+}
